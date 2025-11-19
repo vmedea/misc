@@ -1,0 +1,28 @@
+# Copy this to telemetry_config.py and adapt where needed.
+
+# Current/default Liftoff telemetry configuration
+# Contents of `TelemetryConfiguration.json`
+DESC = '''
+{
+  "EndPoint": "127.0.0.1:9001",
+  "StreamFormat": [
+    "Timestamp",
+    "Position",
+    "Attitude",
+    "Velocity",
+    "Gyro",
+    "Input",
+    "Battery",
+    "MotorRPM"
+  ]
+}
+'''
+# local spec to bind for receive
+# it would be trivial to parse this from DESC EndPoint, but there may be routing in-between
+# so we specify this seperately.
+TELEMETRY_BIND = ("0.0.0.0", 9001)
+#TELEMETRY_BIND = None
+
+# remote spec to request telemetry stream
+#TELEMETRY_ROUTER = ("1.2.3.4", 9003)
+TELEMETRY_ROUTER = None

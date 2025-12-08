@@ -18,7 +18,7 @@ from nmeasim.models import GpsReceiver
 from nmeasim.constants import FixType
 
 from geo_util import gps_from_coord, quat2heading
-from liftoff_telemetry import TelemetryParser, telemetry_socket
+from liftoff_telemetry import TelemetryParser, telemetry_socket, telemetry_keepalive
 
 # Update frequency (Hz)
 UPDATE_FREQUENCY = 10
@@ -37,15 +37,6 @@ def telemetry_main(sock, parser):
         #print(rec) # debug
         global last_telemetry
         last_telemetry = (time.monotonic(), rec)
-
-def telemetry_keepalive(sock, quit_event):
-    keepalive_interval = 30.0
-    while True:
-        if quit_event.wait(keepalive_interval):
-            break
-        print('Send keepalive')
-        sock.send(b'\x00')
-
 
 def read_json_token(client):
     '''

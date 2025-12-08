@@ -4,6 +4,7 @@ Receive telemetry from liftoff, send it to CRSF listener.
 '''
 # Mara Huldra 2025
 # SPDX-License-Identifier: MIT
+import errno
 import json
 from collections import namedtuple
 import math
@@ -14,36 +15,19 @@ import time
 
 from crsf import PacketsTypes
 from geo_util import gps_from_coord, quat2heading, quat2eulers
-from liftoff_telemetry import TelemetryParser, telemetry_socket
+from liftoff_telemetry import TelemetryParser, telemetry_socket, telemetry_keepalive
 
 CRSF_TELEMETRY_INTERVAL = 0.1
 
-def telemetry_keepalive(sock, quit_event):
-    keepalive_interval = 30.0
+def telemetry_liftoff_to_crsf(parser, sock_tel, sock_crsf):
+    starting_altitude = 0.0 # bah
+    next_send = 0.0
     while True:
-        if quit_event.wait(keepalive_interval):
-            break
-        sock.send(b'\x00')
+        data = sock_tel.recv(4096)
 
-if __name__ == '__main__':
-    sock_tel, desc = telemetry_socket()
-    config = json.loads(desc)
-    parser = TelemetryParser(config['StreamFormat'])
-
-    sock_crsf = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock_crsf.connect(('127.0.0.1', 9006))
-
-    evt_quit = threading.Event()
-    thread_ka = threading.Thread(target=telemetry_keepalive, args=(sock_tel, evt_quit))
-    thread_ka.start()
-
-    try:
-        next_send = 0.0
-        while True:
-            data = sock_tel.recv(4096)
-
-            now = time.monotonic()
-            if now >= next_send:
+        now = time.monotonic()
+        if now >= next_send:
+            try:
                 rec = parser.parse(data)
 
                 (longitude, latitude, altitude) = gps_from_coord(rec.Position)
@@ -111,6 +95,21 @@ if __name__ == '__main__':
                 packet += int(rec.Velocity[1] * 100.0).to_bytes(2, byteorder='big', signed=True)
                 sock_crsf.send(packet)
 
+                # Build baro alt
+                packet = bytes([PacketsTypes.BARO_ALT])
+                # MSB = 0: altitude is in decimeters - 10000dm offset (so 0 represents -1000m; 10000 represents 0m (starting altitude); 0x7fff represents 2276.7m);
+                # MSB = 1: altitude is in meters. Without any offset.
+                altitude_packed = int((altitude - starting_altitude) * 10.0) + 10000
+                if altitude_packed < 0:
+                    altitude_packed = 0
+                elif altitude_packed > 0x7fff:
+                    altitude_packed = 0x8000 | min(int(altitude), 0x7fff)
+                 # this is some logarithmic scale, leaving empty because edgetx ignores it anyhow
+                vspeed_packed = 0
+                packet += int(altitude_packed).to_bytes(2, byteorder='big', signed=False) # altitude (packed)
+                packet += int(vspeed_packed).to_bytes(1, byteorder='big', signed=True) # vertical speed (packed)
+                sock_crsf.send(packet)
+
                 # Build airspeed (airspeed in 0.1 * km/h)
                 packet = bytes([PacketsTypes.AIRSPEED])
                 packet += int(vel3d_magnitude * 3.6 * 10).to_bytes(2, byteorder='big', signed=False)
@@ -133,11 +132,33 @@ if __name__ == '__main__':
                 sock_crsf.send(packet)
 
                 # unused: Timestamp, Gyro, Input
+            except OSError as e:
+                if e.errno == errno.EDESTADDRREQ:
+                    pass
+            except ConnectionRefusedError:
+                pass
 
-                next_send = now + CRSF_TELEMETRY_INTERVAL
+            next_send = now + CRSF_TELEMETRY_INTERVAL
+
+
+if __name__ == '__main__':
+    sock_tel, desc = telemetry_socket()
+    config = json.loads(desc)
+    parser = TelemetryParser(config['StreamFormat'])
+
+    sock_crsf = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock_crsf.connect(('127.0.0.1', 9006))
+
+    evt_quit = threading.Event()
+    thread_ka = threading.Thread(target=telemetry_keepalive, args=(sock_tel, evt_quit))
+    thread_ka.start()
+
+    try:
+        telemetry_liftoff_to_crsf(parser, sock_tel, sock_crsf)
     finally:
         evt_quit.set()
 
         sock_tel.close()
+        sock_crsf.close()
 
         thread_ka.join()

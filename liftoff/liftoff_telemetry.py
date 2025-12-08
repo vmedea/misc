@@ -78,6 +78,13 @@ class TelemetryParser:
 			ptr += size
 		return self.tuple(*rv)
 
+def telemetry_keepalive(sock, quit_event):
+    keepalive_interval = 30.0
+    while True:
+        if quit_event.wait(keepalive_interval):
+            break
+        sock.send(b'\x00')
+
 def telemetry_socket():
     from telemetry_config import DESC, TELEMETRY_BIND, TELEMETRY_ROUTER
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)

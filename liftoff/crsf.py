@@ -1,4 +1,5 @@
 # CRSF spec: https://github.com/tbs-fpv/tbs-crsf-spec/blob/main/crsf.md#0x16-rc-channels-packed-payload
+# also: https://github.com/crsf-wg/crsf/wiki
 # Mara Huldra 2025
 # SPDX-License-Identifier: MIT
 from enum import IntEnum

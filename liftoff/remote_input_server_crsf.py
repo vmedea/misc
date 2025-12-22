@@ -4,6 +4,7 @@
 from enum import IntEnum
 import evdev
 from evdev.ecodes import EV_ABS, EV_KEY
+import evdev.ecodes as ec
 import json
 import os
 import socket
@@ -32,20 +33,39 @@ DEVICES_JSON = [
     "capabilities": {
             # see /usr/include/linux/input-event-codes.h
             # EV_KEY (13 keys)
-            "1": [288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300],
-            # EV_ABS (6 axes)
+            "1": [
+                ec.BTN_JOYSTICK,
+                ec.BTN_THUMB,
+                ec.BTN_THUMB2,
+                ec.BTN_TOP,
+                ec.BTN_TOP2,
+                ec.BTN_PINKIE,
+                ec.BTN_BASE,
+                ec.BTN_BASE2,
+                ec.BTN_BASE3,
+                ec.BTN_BASE4,
+                ec.BTN_BASE5,
+                ec.BTN_BASE6,
+                ec.BTN_BASE6 + 1, # no constant for 300
+            ],
+            # EV_ABS (7 axes)
             "3": [
-                [0, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
-                [1, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
-                [2, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
-                [3, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
-                [6, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
-                [7, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}]],
-            # EV_MSC / MSC_SCAN
-            "4": [4]
+                [ec.ABS_X, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
+                [ec.ABS_Y, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
+                [ec.ABS_Z, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
+                [ec.ABS_RX, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
+                [ec.ABS_THROTTLE, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
+                [ec.ABS_RUDDER, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
+                [ec.ABS_WHEEL, {"value": 0, "min": 0, "max": AXIS_MAX, "fuzz": 7, "flat": 127, "resolution": 0}],
+            ],
+            # EV_MSC
+            "4": [
+                ec.MSC_SCAN,
+            ]
         },
         # Radiomaster Pocket
-        "vendor": 4617, "product": 20308
+        "vendor": 0x1209,
+        "product": 0x4f54,
     },
 ]
 BUTTONS = DEVICES_JSON[0]["capabilities"]["1"]
@@ -101,6 +121,11 @@ def do_controller_mapping(devices, old_channels, channels):
     # 6  S1-pot (axis)
     if channels[6] != old_channels[6]:
         devices[0].write(EV_ABS, AXES[5], channels[6])
+    # 7  button SA (2POS, fixed)
+    if channels[7] != old_channels[7]:
+        devices[0].write(EV_KEY, BUTTONS[11], bool(channels[7] < AXIS_MID))
+        devices[0].write(EV_KEY, BUTTONS[12], bool(channels[7] >= AXIS_MID))
+        devices[0].write(EV_ABS, AXES[6], channels[7])
     # 9  trim RUD (3POS, momentary)
     if channels[8] != old_channels[8]:
         devices[0].write(EV_KEY, BUTTONS[3], bool(channels[8] <= AXIS_3POS_LEFT))

@@ -23,7 +23,10 @@ def telemetry_liftoff_to_crsf(parser, sock_tel, sock_crsf):
     starting_altitude = 0.0 # bah
     next_send = 0.0
     while True:
-        data = sock_tel.recv(4096)
+        try:
+            data = sock_tel.recv(4096)
+        except ConnectionRefusedError:
+            continue
 
         now = time.monotonic()
         if now >= next_send:

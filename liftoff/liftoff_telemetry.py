@@ -83,7 +83,10 @@ def telemetry_keepalive(sock, quit_event):
     while True:
         if quit_event.wait(keepalive_interval):
             break
-        sock.send(b'\x00')
+        try:
+            sock.send(b'\x00')
+        except ConnectionRefusedError:
+            pass
 
 def telemetry_socket():
     from telemetry_config import DESC, TELEMETRY_BIND, TELEMETRY_ROUTER
@@ -91,7 +94,10 @@ def telemetry_socket():
     # XXX keepalive thread
     if TELEMETRY_ROUTER:
         sock.connect(TELEMETRY_ROUTER)
-        sock.send(b'\x00') # Request data
+        try:
+            sock.send(b'\x00') # Request data
+        except ConnectionRefusedError:
+            pass
     else:
         sock.bind(TELEMETRY_BIND)
     return sock, DESC
